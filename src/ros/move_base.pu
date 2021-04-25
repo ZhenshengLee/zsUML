@@ -1,0 +1,49 @@
+@startuml move_base
+title move_base线程时序图
+header %date("yyyy.MM.dd") \n
+autonumber
+actor rviz
+participant move_base
+participant planThread
+actor base_controller
+group move_base初始化
+activate move_base
+move_base -> move_base : ini
+move_base -> planThread : boost::thread
+destroy move_base
+activate planThread
+planThread -> planThread : lock(planner_mutex_);
+rnote over planThread : 等待锁
+planThread -> move_base : planner_cond_.wait(lock);
+destroy planThread
+activate move_base
+end
+... 等待目标点指令 ...
+rviz -> move_base : goal
+group executeCb
+move_base -> move_base : publishZeroVelocity();
+move_base -> planThread : lock(); notify_one();
+rnote over move_base : 规划一次
+destroy move_base
+activate planThread
+planThread -> planThread : makePlan();
+planThread -> move_base : unlock();
+destroy planThread
+activate move_base
+group while(n.ok())
+move_base -> move_base : state_ = PLANNING;
+move_base -> planThread : lock(); notify_one();
+destroy move_base
+activate planThread
+planThread -> planThread : makePlan();
+planThread -> move_base : unlock(); new_global_plan_ latest_plan_
+destroy planThread
+activate move_base
+group executeCycle状态机
+move_base -> move_base : tc_->setPlan(*controller_plan_)
+move_base -> move_base : tc_->computeVelocityCommands(cmd_vel)
+move_base -> base_controller : vel_pub_.publish(cmd_vel);
+end
+end
+end
+@enduml
